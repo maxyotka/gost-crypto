@@ -39,3 +39,4 @@ docs/
 
 # Vendor (optional)
 # vendor/
+*.pdf
