@@ -47,6 +47,8 @@ func (c *cbcEncrypter) CryptBlocks(dst, src []byte) {
 		src = src[c.blockSize:]
 		dst = dst[c.blockSize:]
 	}
+	// Save the last ciphertext block as IV for chained CryptBlocks calls.
+	copy(c.iv, prev)
 }
 
 // cbcDecrypter implements cipher.BlockMode for CBC decryption.
@@ -78,12 +80,15 @@ func (c *cbcDecrypter) CryptBlocks(dst, src []byte) {
 		panic("gost341315: output smaller than input")
 	}
 
-	// We need to process blocks. To allow in-place decryption (dst == src),
-	// process from the end.
+	// Save last ciphertext block as the new IV before processing,
+	// in case dst and src overlap (in-place decryption).
+	newIV := make([]byte, c.blockSize)
+	copy(newIV, src[len(src)-c.blockSize:])
+
+	// Process blocks from the end to support in-place decryption (dst == src).
 	end := len(src)
 	for end > 0 {
 		start := end - c.blockSize
-		// Determine the previous ciphertext block (or IV for the first block).
 		var prev []byte
 		if start == 0 {
 			prev = c.iv
@@ -94,4 +99,7 @@ func (c *cbcDecrypter) CryptBlocks(dst, src []byte) {
 		xorBytes(dst[start:end], dst[start:end], prev)
 		end = start
 	}
+
+	// Update IV for chained CryptBlocks calls.
+	copy(c.iv, newIV)
 }

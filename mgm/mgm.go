@@ -80,6 +80,9 @@ func (m *mgm) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, error
 	if len(nonce) != m.blockSize {
 		return nil, errors.New("mgm: incorrect nonce length")
 	}
+	if nonce[0]&0x80 != 0 {
+		return nil, errors.New("mgm: nonce MSB must be zero")
+	}
 	if len(ciphertext) < m.tagSize {
 		return nil, errors.New("mgm: ciphertext too short")
 	}

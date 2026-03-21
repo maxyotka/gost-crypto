@@ -106,11 +106,6 @@ func (m *cmac) Write(p []byte) (n int, err error) {
 	}
 
 	if len(p) > 0 {
-		if m.bufLen > 0 {
-			xorBlock(m.x, m.buf[:m.blockSize])
-			m.b.Encrypt(m.x, m.x)
-			m.bufLen = 0
-		}
 		copy(m.buf, p)
 		m.bufLen = len(p)
 	}

@@ -120,14 +120,8 @@ func (m *cmac) Write(p []byte) (n int, err error) {
 		p = p[m.blockSize:]
 	}
 
-	// Buffer remaining bytes.
+	// Buffer remaining bytes (bufLen is always 0 here).
 	if len(p) > 0 {
-		if m.bufLen > 0 {
-			// The buffer is full (from earlier), process it first.
-			xorBytes(m.x, m.x, m.buf[:m.blockSize])
-			m.b.Encrypt(m.x, m.x)
-			m.bufLen = 0
-		}
 		copy(m.buf, p)
 		m.bufLen = len(p)
 	}

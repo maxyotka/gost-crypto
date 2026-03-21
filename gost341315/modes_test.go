@@ -108,6 +108,42 @@ func TestCBCRoundtrip(t *testing.T) {
 	t.Run("Magma", func(t *testing.T) { testCBCRoundtrip(t, newMagma(t)) })
 }
 
+func testCBCChunked(t *testing.T, b cipher.Block) {
+	t.Helper()
+	bs := b.BlockSize()
+	iv := randBytes(t, bs)
+	plaintext := randBytes(t, 6*bs)
+
+	// Encrypt in one call.
+	ctFull := make([]byte, len(plaintext))
+	NewCBCEncrypter(b, iv).CryptBlocks(ctFull, plaintext)
+
+	// Encrypt in two calls (3 blocks each).
+	ctChunked := make([]byte, len(plaintext))
+	enc := NewCBCEncrypter(b, iv)
+	enc.CryptBlocks(ctChunked[:3*bs], plaintext[:3*bs])
+	enc.CryptBlocks(ctChunked[3*bs:], plaintext[3*bs:])
+
+	if !bytes.Equal(ctFull, ctChunked) {
+		t.Fatal("CBC chunked encrypt differs from single-call encrypt")
+	}
+
+	// Decrypt in two calls.
+	ptChunked := make([]byte, len(ctFull))
+	dec := NewCBCDecrypter(b, iv)
+	dec.CryptBlocks(ptChunked[:3*bs], ctFull[:3*bs])
+	dec.CryptBlocks(ptChunked[3*bs:], ctFull[3*bs:])
+
+	if !bytes.Equal(plaintext, ptChunked) {
+		t.Fatal("CBC chunked decrypt differs from original plaintext")
+	}
+}
+
+func TestCBCChunked(t *testing.T) {
+	t.Run("Kuznechik", func(t *testing.T) { testCBCChunked(t, newKuznechik(t)) })
+	t.Run("Magma", func(t *testing.T) { testCBCChunked(t, newMagma(t)) })
+}
+
 // --- CTR ---
 
 func testCTRRoundtrip(t *testing.T, b cipher.Block) {
