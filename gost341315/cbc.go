@@ -9,23 +9,26 @@ package gost341315
 
 import "crypto/cipher"
 
-// cbcEncrypter implements cipher.BlockMode for CBC encryption.
+// cbcEncrypter implements cipher.BlockMode for GOST R 34.13-2015 CBC mode.
+// Supports shift register parameter m >= n (len(iv) >= blockSize).
+// When len(iv) == blockSize (m=n), this is standard textbook CBC.
 type cbcEncrypter struct {
 	b         cipher.Block
 	blockSize int
-	iv        []byte
+	reg       []byte // shift register of length m
 }
 
 // NewCBCEncrypter returns a cipher.BlockMode which encrypts in CBC mode.
-// The iv length must equal the block size.
+// The iv length must be a positive multiple of the block size (parameter m).
+// Use len(iv)==blockSize for standard CBC, or larger for GOST m>n mode.
 func NewCBCEncrypter(b cipher.Block, iv []byte) cipher.BlockMode {
 	bs := b.BlockSize()
-	if len(iv) != bs {
-		panic("gost341315: IV length must equal block size")
+	if len(iv) < bs || len(iv)%bs != 0 {
+		panic("gost341315: IV length must be a positive multiple of block size")
 	}
-	ivCopy := make([]byte, bs)
-	copy(ivCopy, iv)
-	return &cbcEncrypter{b: b, blockSize: bs, iv: ivCopy}
+	reg := make([]byte, len(iv))
+	copy(reg, iv)
+	return &cbcEncrypter{b: b, blockSize: bs, reg: reg}
 }
 
 func (c *cbcEncrypter) BlockSize() int { return c.blockSize }
@@ -38,36 +41,38 @@ func (c *cbcEncrypter) CryptBlocks(dst, src []byte) {
 		panic("gost341315: output smaller than input")
 	}
 
-	prev := c.iv
+	n := c.blockSize
 	for len(src) > 0 {
-		// XOR plaintext block with previous ciphertext (or IV).
-		xorBytes(dst[:c.blockSize], src[:c.blockSize], prev)
-		c.b.Encrypt(dst[:c.blockSize], dst[:c.blockSize])
-		prev = dst[:c.blockSize]
-		src = src[c.blockSize:]
-		dst = dst[c.blockSize:]
+		// Ci = E(Pi XOR MSB_n(R))
+		xorBytes(dst[:n], src[:n], c.reg[:n])
+		c.b.Encrypt(dst[:n], dst[:n])
+
+		// R = LSB_{m-n}(R) || Ci
+		copy(c.reg, c.reg[n:])
+		copy(c.reg[len(c.reg)-n:], dst[:n])
+
+		src = src[n:]
+		dst = dst[n:]
 	}
-	// Save the last ciphertext block as IV for chained CryptBlocks calls.
-	copy(c.iv, prev)
 }
 
-// cbcDecrypter implements cipher.BlockMode for CBC decryption.
+// cbcDecrypter implements cipher.BlockMode for GOST R 34.13-2015 CBC decryption.
 type cbcDecrypter struct {
 	b         cipher.Block
 	blockSize int
-	iv        []byte
+	reg       []byte // shift register of length m
 }
 
 // NewCBCDecrypter returns a cipher.BlockMode which decrypts in CBC mode.
-// The iv length must equal the block size.
+// The iv length must be a positive multiple of the block size (parameter m).
 func NewCBCDecrypter(b cipher.Block, iv []byte) cipher.BlockMode {
 	bs := b.BlockSize()
-	if len(iv) != bs {
-		panic("gost341315: IV length must equal block size")
+	if len(iv) < bs || len(iv)%bs != 0 {
+		panic("gost341315: IV length must be a positive multiple of block size")
 	}
-	ivCopy := make([]byte, bs)
-	copy(ivCopy, iv)
-	return &cbcDecrypter{b: b, blockSize: bs, iv: ivCopy}
+	reg := make([]byte, len(iv))
+	copy(reg, iv)
+	return &cbcDecrypter{b: b, blockSize: bs, reg: reg}
 }
 
 func (c *cbcDecrypter) BlockSize() int { return c.blockSize }
@@ -80,26 +85,21 @@ func (c *cbcDecrypter) CryptBlocks(dst, src []byte) {
 		panic("gost341315: output smaller than input")
 	}
 
-	// Save last ciphertext block as the new IV before processing,
-	// in case dst and src overlap (in-place decryption).
-	newIV := make([]byte, c.blockSize)
-	copy(newIV, src[len(src)-c.blockSize:])
+	n := c.blockSize
+	for len(src) > 0 {
+		// Save Ci before potential in-place overwrite.
+		var ci [32]byte // max block size
+		copy(ci[:n], src[:n])
 
-	// Process blocks from the end to support in-place decryption (dst == src).
-	end := len(src)
-	for end > 0 {
-		start := end - c.blockSize
-		var prev []byte
-		if start == 0 {
-			prev = c.iv
-		} else {
-			prev = src[start-c.blockSize : start]
-		}
-		c.b.Decrypt(dst[start:end], src[start:end])
-		xorBytes(dst[start:end], dst[start:end], prev)
-		end = start
+		// Pi = D(Ci) XOR MSB_n(R)
+		c.b.Decrypt(dst[:n], src[:n])
+		xorBytes(dst[:n], dst[:n], c.reg[:n])
+
+		// R = LSB_{m-n}(R) || Ci
+		copy(c.reg, c.reg[n:])
+		copy(c.reg[len(c.reg)-n:], ci[:n])
+
+		src = src[n:]
+		dst = dst[n:]
 	}
-
-	// Update IV for chained CryptBlocks calls.
-	copy(c.iv, newIV)
 }

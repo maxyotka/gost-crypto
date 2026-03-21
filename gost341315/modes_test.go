@@ -593,3 +593,219 @@ func TestKAT_MAC_Magma(t *testing.T) {
 		t.Fatalf("MAC:\n  want: %x\n  got:  %x", expectedMAC, tag)
 	}
 }
+
+// TestKAT_OFB_Kuznechik verifies OFB mode against GOST R 34.13-2015, A.1.3.
+// m=2n=256, IV is 32 bytes.
+func TestKAT_OFB_Kuznechik(t *testing.T) {
+	b, err := gost341215.NewKuznechik(kuznechikKATKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	iv := mustHex("1234567890abcef0a1b2c3d4e5f0011223344556677889901213141516171819")
+
+	var plaintext []byte
+	for _, pt := range kuznechikKATPT {
+		plaintext = append(plaintext, pt...)
+	}
+
+	expectedCT := mustHex(
+		"81800a59b1842b24ff1f795e897abd95" +
+			"ed5b47a7048cfab48fb521369d9326bf" +
+			"66a257ac3ca0b8b1c80fe7fc10288a13" +
+			"203ebbc066138660a0292243f6903150",
+	)
+
+	ciphertext := make([]byte, len(plaintext))
+	NewOFB(b, iv).XORKeyStream(ciphertext, plaintext)
+
+	if !bytes.Equal(ciphertext, expectedCT) {
+		t.Fatalf("OFB encrypt:\n  want: %x\n  got:  %x", expectedCT, ciphertext)
+	}
+
+	recovered := make([]byte, len(ciphertext))
+	NewOFB(b, iv).XORKeyStream(recovered, ciphertext)
+	if !bytes.Equal(recovered, plaintext) {
+		t.Fatalf("OFB decrypt mismatch")
+	}
+}
+
+// TestKAT_OFB_Magma verifies OFB mode against GOST R 34.13-2015, A.2.3.
+// m=2n=128, IV is 16 bytes.
+func TestKAT_OFB_Magma(t *testing.T) {
+	b, err := gost341215.NewMagma(magmaKATKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	iv := mustHex("1234567890abcdef234567890abcdef1")
+
+	var plaintext []byte
+	for _, pt := range magmaKATPT {
+		plaintext = append(plaintext, pt...)
+	}
+
+	expectedCT := mustHex(
+		"db37e0e266903c83" +
+			"0d46644c1f9a089c" +
+			"a0f83062430e327e" +
+			"c824efb8bd4fdb05",
+	)
+
+	ciphertext := make([]byte, len(plaintext))
+	NewOFB(b, iv).XORKeyStream(ciphertext, plaintext)
+
+	if !bytes.Equal(ciphertext, expectedCT) {
+		t.Fatalf("OFB encrypt:\n  want: %x\n  got:  %x", expectedCT, ciphertext)
+	}
+
+	recovered := make([]byte, len(ciphertext))
+	NewOFB(b, iv).XORKeyStream(recovered, ciphertext)
+	if !bytes.Equal(recovered, plaintext) {
+		t.Fatalf("OFB decrypt mismatch")
+	}
+}
+
+// TestKAT_CBC_Kuznechik verifies CBC mode against GOST R 34.13-2015, A.1.4.
+// m=2n=256, IV is 32 bytes.
+func TestKAT_CBC_Kuznechik(t *testing.T) {
+	b, err := gost341215.NewKuznechik(kuznechikKATKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	iv := mustHex("1234567890abcef0a1b2c3d4e5f0011223344556677889901213141516171819")
+
+	var plaintext []byte
+	for _, pt := range kuznechikKATPT {
+		plaintext = append(plaintext, pt...)
+	}
+
+	expectedCT := mustHex(
+		"689972d4a085fa4d90e52e3d6d7dcc27" +
+			"2826e661b478eca6af1e8e448d5ea5ac" +
+			"fe7babf1e91999e85640e8b0f49d90d0" +
+			"167688065a895c631a2d9a1560b63970",
+	)
+
+	ciphertext := make([]byte, len(plaintext))
+	NewCBCEncrypter(b, iv).CryptBlocks(ciphertext, plaintext)
+
+	if !bytes.Equal(ciphertext, expectedCT) {
+		t.Fatalf("CBC encrypt:\n  want: %x\n  got:  %x", expectedCT, ciphertext)
+	}
+
+	recovered := make([]byte, len(ciphertext))
+	NewCBCDecrypter(b, iv).CryptBlocks(recovered, ciphertext)
+	if !bytes.Equal(recovered, plaintext) {
+		t.Fatalf("CBC decrypt mismatch")
+	}
+}
+
+// TestKAT_CBC_Magma verifies CBC mode against GOST R 34.13-2015, A.2.4.
+// m=3n=192, IV is 24 bytes.
+func TestKAT_CBC_Magma(t *testing.T) {
+	b, err := gost341215.NewMagma(magmaKATKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	iv := mustHex("1234567890abcdef234567890abcdef134567890abcdef12")
+
+	var plaintext []byte
+	for _, pt := range magmaKATPT {
+		plaintext = append(plaintext, pt...)
+	}
+
+	expectedCT := mustHex(
+		"96d1b05eea683919" +
+			"aff76129abb937b9" +
+			"5058b4a1c4bc0019" +
+			"20b78b1a7cd7e667",
+	)
+
+	ciphertext := make([]byte, len(plaintext))
+	NewCBCEncrypter(b, iv).CryptBlocks(ciphertext, plaintext)
+
+	if !bytes.Equal(ciphertext, expectedCT) {
+		t.Fatalf("CBC encrypt:\n  want: %x\n  got:  %x", expectedCT, ciphertext)
+	}
+
+	recovered := make([]byte, len(ciphertext))
+	NewCBCDecrypter(b, iv).CryptBlocks(recovered, ciphertext)
+	if !bytes.Equal(recovered, plaintext) {
+		t.Fatalf("CBC decrypt mismatch")
+	}
+}
+
+// TestKAT_CFB_Kuznechik verifies CFB mode against GOST R 34.13-2015, A.1.5.
+// m=2n=256, IV is 32 bytes.
+func TestKAT_CFB_Kuznechik(t *testing.T) {
+	b, err := gost341215.NewKuznechik(kuznechikKATKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	iv := mustHex("1234567890abcef0a1b2c3d4e5f0011223344556677889901213141516171819")
+
+	var plaintext []byte
+	for _, pt := range kuznechikKATPT {
+		plaintext = append(plaintext, pt...)
+	}
+
+	expectedCT := mustHex(
+		"81800a59b1842b24ff1f795e897abd95" +
+			"ed5b47a7048cfab48fb521369d9326bf" +
+			"79f2a8eb5cc68d38842d264e97a238b5" +
+			"4ffebecd4e922de6c75bd9dd44fbf4d1",
+	)
+
+	ciphertext := make([]byte, len(plaintext))
+	NewCFBEncrypter(b, iv).XORKeyStream(ciphertext, plaintext)
+
+	if !bytes.Equal(ciphertext, expectedCT) {
+		t.Fatalf("CFB encrypt:\n  want: %x\n  got:  %x", expectedCT, ciphertext)
+	}
+
+	recovered := make([]byte, len(ciphertext))
+	NewCFBDecrypter(b, iv).XORKeyStream(recovered, ciphertext)
+	if !bytes.Equal(recovered, plaintext) {
+		t.Fatalf("CFB decrypt mismatch")
+	}
+}
+
+// TestKAT_CFB_Magma verifies CFB mode against GOST R 34.13-2015, A.2.5.
+// m=2n=128, IV is 16 bytes.
+func TestKAT_CFB_Magma(t *testing.T) {
+	b, err := gost341215.NewMagma(magmaKATKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	iv := mustHex("1234567890abcdef234567890abcdef1")
+
+	var plaintext []byte
+	for _, pt := range magmaKATPT {
+		plaintext = append(plaintext, pt...)
+	}
+
+	expectedCT := mustHex(
+		"db37e0e266903c83" +
+			"0d46644c1f9a089c" +
+			"24bdd2035315d38b" +
+			"bcc0321421075505",
+	)
+
+	ciphertext := make([]byte, len(plaintext))
+	NewCFBEncrypter(b, iv).XORKeyStream(ciphertext, plaintext)
+
+	if !bytes.Equal(ciphertext, expectedCT) {
+		t.Fatalf("CFB encrypt:\n  want: %x\n  got:  %x", expectedCT, ciphertext)
+	}
+
+	recovered := make([]byte, len(ciphertext))
+	NewCFBDecrypter(b, iv).XORKeyStream(recovered, ciphertext)
+	if !bytes.Equal(recovered, plaintext) {
+		t.Fatalf("CFB decrypt mismatch")
+	}
+}
