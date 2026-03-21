@@ -33,13 +33,22 @@ func constantTimeByteEq(a, b byte) int {
 	return int(x & 1)
 }
 
-// Zeroize securely zeroes a byte slice. The loop-based approach prevents
-// the compiler from optimizing away the writes.
+// zeroSink is read after zeroing to create a data dependency that
+// prevents the compiler from eliminating the zero-writes as dead stores.
+// This technique is used by BoringSSL and other cryptographic libraries.
+var zeroSink byte
+
+// Zeroize securely zeroes a byte slice. The combination of //go:noinline
+// and a read-back into a package-level variable guarantees the writes
+// cannot be optimized away by the compiler.
 //
 //go:noinline
 func Zeroize(b []byte) {
 	for i := range b {
 		b[i] = 0
+	}
+	if len(b) > 0 {
+		zeroSink = b[0]
 	}
 }
 
