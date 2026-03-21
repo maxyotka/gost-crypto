@@ -309,3 +309,95 @@ func TestLEConversions(t *testing.T) {
 		t.Errorf("leToBigInt round-trip: got %x, want %x", back, v)
 	}
 }
+
+// TestAllCurves validates base point, order, and sign/verify for every curve.
+func TestAllCurves(t *testing.T) {
+	curves := []struct {
+		name string
+		c    *Curve
+	}{
+		{"256-paramSetA", CurveParamSetA()},
+		{"256-paramSetB", CurveParamSetB()},
+		{"256-paramSetC", CurveParamSetC()},
+		{"256-paramSetD", CurveParamSetD()},
+		{"512-paramSetA", Curve512ParamSetA()},
+		{"512-paramSetB", Curve512ParamSetB()},
+		{"512-paramSetC", Curve512ParamSetC()},
+	}
+
+	for _, tc := range curves {
+		t.Run(tc.name+"/BasePointOnCurve", func(t *testing.T) {
+			if !tc.c.IsOnCurve(tc.c.X, tc.c.Y) {
+				t.Fatal("base point is not on the curve")
+			}
+		})
+
+		t.Run(tc.name+"/BasePointOrder", func(t *testing.T) {
+			x, y := tc.c.ScalarBaseMult(tc.c.Q)
+			if x != nil || y != nil {
+				t.Fatal("Q * G is not the point at infinity")
+			}
+		})
+
+		t.Run(tc.name+"/SignVerify", func(t *testing.T) {
+			priv, pub, err := GenerateKey(tc.c, rand.Reader)
+			if err != nil {
+				t.Fatalf("GenerateKey: %v", err)
+			}
+
+			digest := make([]byte, tc.c.ByteSize())
+			if _, err := rand.Read(digest); err != nil {
+				t.Fatalf("rand.Read: %v", err)
+			}
+
+			sig, err := priv.SignDigest(digest, rand.Reader)
+			if err != nil {
+				t.Fatalf("SignDigest: %v", err)
+			}
+
+			wantSigSize := 2 * tc.c.ByteSize()
+			if len(sig) != wantSigSize {
+				t.Fatalf("sig size: got %d, want %d", len(sig), wantSigSize)
+			}
+
+			ok, err := pub.VerifyDigest(digest, sig)
+			if err != nil {
+				t.Fatalf("VerifyDigest: %v", err)
+			}
+			if !ok {
+				t.Fatal("valid signature failed verification")
+			}
+		})
+
+		t.Run(tc.name+"/RawKeyRoundtrip", func(t *testing.T) {
+			priv, pub, err := GenerateKey(tc.c, rand.Reader)
+			if err != nil {
+				t.Fatalf("GenerateKey: %v", err)
+			}
+
+			privRaw := priv.Raw()
+			if len(privRaw) != tc.c.ByteSize() {
+				t.Fatalf("priv.Raw() len: got %d, want %d", len(privRaw), tc.c.ByteSize())
+			}
+			priv2, err := NewPrivateKey(tc.c, privRaw)
+			if err != nil {
+				t.Fatalf("NewPrivateKey: %v", err)
+			}
+			if priv.D.Cmp(priv2.D) != 0 {
+				t.Error("private key round-trip mismatch")
+			}
+
+			pubRaw := pub.Raw()
+			if len(pubRaw) != 2*tc.c.ByteSize() {
+				t.Fatalf("pub.Raw() len: got %d, want %d", len(pubRaw), 2*tc.c.ByteSize())
+			}
+			pub2, err := NewPublicKey(tc.c, pubRaw)
+			if err != nil {
+				t.Fatalf("NewPublicKey: %v", err)
+			}
+			if pub.X.Cmp(pub2.X) != 0 || pub.Y.Cmp(pub2.Y) != 0 {
+				t.Error("public key round-trip mismatch")
+			}
+		})
+	}
+}

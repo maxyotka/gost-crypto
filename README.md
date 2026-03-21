@@ -70,13 +70,26 @@ golangci-lint run       # линтер
 
 ## Лицензия
 
-[AGPL-3.0](LICENSE)
+### Open Source — AGPL-3.0
+
+Для open-source проектов и личного использования: [AGPL-3.0](LICENSE).
+
+Это означает: если вы используете gost-crypto в своём ПО и **распространяете** его (включая SaaS) — вы обязаны открыть исходный код своего ПО под AGPL-3.0.
+
+### Коммерческая лицензия
+
+Для использования в **закрытом коммерческом ПО** без обязательств AGPL доступна коммерческая лицензия.
+
+Коммерческая лицензия позволяет:
+- Использовать gost-crypto в closed-source продуктах
+- Распространять без раскрытия исходного кода
+- Встраивать в SaaS без ограничений AGPL
+- Получать приоритетную поддержку
+
+**Запрос:** [max@gundyrev.com](mailto:max@gundyrev.com)
 
 ```
 Copyright (C) 2026 maxyotka
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published
-by the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+SPDX-License-Identifier: AGPL-3.0-or-later OR Commercial
 ```

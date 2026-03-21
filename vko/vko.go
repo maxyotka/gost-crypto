@@ -50,16 +50,13 @@ func KEK512(priv *gost341012.PrivateKey, pub *gost341012.PublicKey, ukm *big.Int
 	return h.Sum(nil), nil
 }
 
-// coordSize is the size of a single coordinate in bytes (256-bit curve).
-const coordSize = 32
-
 // sharedPoint computes the VKO shared point and returns LE(x) || LE(y).
 //
 // Algorithm (RFC 7836, Section 4.3):
 //  1. scalar = ukm * d (mod q)
 //  2. P = scalar * Q_peer
 //  3. If P is the point at infinity, return error
-//  4. Return LE(x) || LE(y), 32 bytes each
+//  4. Return LE(x) || LE(y)
 func sharedPoint(priv *gost341012.PrivateKey, pub *gost341012.PublicKey, ukm *big.Int) ([]byte, error) {
 	if priv == nil || priv.Curve == nil || priv.D == nil {
 		return nil, errors.New("vko: invalid private key")
@@ -72,6 +69,7 @@ func sharedPoint(priv *gost341012.PrivateKey, pub *gost341012.PublicKey, ukm *bi
 	}
 
 	curve := priv.Curve
+	coordSize := curve.ByteSize()
 
 	// scalar = ukm * d (mod q)
 	scalar := new(big.Int).Mul(ukm, priv.D)

@@ -100,9 +100,10 @@ func (priv *PrivateKey) signDigestInternal(digest []byte, random io.Reader, fixe
 		}
 
 		// Step 6: signature = LE(s) || LE(r)
-		sig := make([]byte, SignatureSize)
-		copy(sig[:PrivateKeySize], bigIntToLE(s, PrivateKeySize))
-		copy(sig[PrivateKeySize:], bigIntToLE(r, PrivateKeySize))
+		size := c.ByteSize()
+		sig := make([]byte, 2*size)
+		copy(sig[:size], bigIntToLE(s, size))
+		copy(sig[size:], bigIntToLE(r, size))
 		return sig, nil
 	}
 }
@@ -124,16 +125,17 @@ func (pub *PublicKey) VerifyDigest(digest, signature []byte) (bool, error) {
 	if pub.X == nil || pub.Y == nil {
 		return false, errors.New("gost341012: invalid public key")
 	}
-	if len(signature) != SignatureSize {
+	c := pub.Curve
+	size := c.ByteSize()
+	if len(signature) != 2*size {
 		return false, errors.New("gost341012: invalid signature size")
 	}
 
-	c := pub.Curve
 	q := c.Q
 
 	// Step 1: extract s and r.
-	s := leToBigInt(signature[:PrivateKeySize])
-	r := leToBigInt(signature[PrivateKeySize:])
+	s := leToBigInt(signature[:size])
+	r := leToBigInt(signature[size:])
 
 	// Step 2: range check.
 	if s.Sign() <= 0 || s.Cmp(q) >= 0 {
