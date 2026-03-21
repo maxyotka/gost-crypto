@@ -13,7 +13,10 @@ import (
 	"testing"
 )
 
-// Test vectors from ГОСТ Р 34.11-2012 (Appendix A).
+// Test vectors from ГОСТ Р 34.11-2012 / RFC 6986 Appendix A.
+// Note: RFC 6986 presents messages and hashes in LE byte order.
+// These vectors use actual (network) byte order, verified against
+// RFC 6986 (reversed) and cross-verified with gogost.
 var testVectors = []struct {
 	name    string
 	message string // hex-encoded
@@ -135,21 +138,42 @@ func TestIncrementalWrite(t *testing.T) {
 }
 
 func TestEmptyMessage(t *testing.T) {
-	// Empty message test — hash of zero-length input.
-	h512 := New512()
-	h512.Write(nil)
-	sum512 := hex.EncodeToString(h512.Sum(nil))
-
-	h256 := New256()
-	h256.Write(nil)
-	sum256 := hex.EncodeToString(h256.Sum(nil))
-
-	// Just verify it produces a deterministic result (no crash) and correct length.
-	if len(sum512) != 128 {
-		t.Errorf("Empty 512: expected 128 hex chars, got %d", len(sum512))
+	// KAT: Stribog-256("") — verified against RFC 6986 and self-test.
+	want256 := "3f539a213e97c802cc229d474c6aa32a825a360b2a933a949fd925208d9ce1bb"
+	got256 := hex.EncodeToString(New256().Sum(nil))
+	if got256 != want256 {
+		t.Errorf("Empty Stribog-256:\n  got  %s\n  want %s", got256, want256)
 	}
-	if len(sum256) != 64 {
-		t.Errorf("Empty 256: expected 64 hex chars, got %d", len(sum256))
+
+	// KAT: Stribog-512("") — cross-verified with gogost.
+	want512 := "8e945da209aa869f0455928529bcae4679e9873ab707b55315f56ceb98bef0a7362f715528356ee83cda5f2aac4c6ad2ba3a715c1bcd81cb8e9f90bf4c1c1a8a"
+	got512 := hex.EncodeToString(New512().Sum(nil))
+	if got512 != want512 {
+		t.Errorf("Empty Stribog-512:\n  got  %s\n  want %s", got512, want512)
+	}
+}
+
+func TestPartialBlockWrites(t *testing.T) {
+	// Write data in chunks of 7 (not aligned to block size 64).
+	data := make([]byte, 1000)
+	for i := range data {
+		data[i] = byte(i)
+	}
+
+	full := Sum256(data)
+
+	h := New256()
+	for i := 0; i < len(data); i += 7 {
+		end := i + 7
+		if end > len(data) {
+			end = len(data)
+		}
+		h.Write(data[i:end])
+	}
+	chunked := h.Sum(nil)
+
+	if hex.EncodeToString(full[:]) != hex.EncodeToString(chunked) {
+		t.Errorf("Partial block writes mismatch:\n  full:    %x\n  chunked: %x", full, chunked)
 	}
 }
 

@@ -57,6 +57,45 @@ func TestMGMKuznechikRFC9058(t *testing.T) {
 	}
 }
 
+// TestMGMMagmaRoundtrip tests MGM with Magma (64-bit block).
+func TestMGMMagmaRoundtrip(t *testing.T) {
+	key, _ := hex.DecodeString("FFEEDDCCBBAA99887766554433221100F0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFF")
+	block, err := gost341215.NewMagma(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	aead, err := NewMGM(block, 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nonce := make([]byte, 8)
+	nonce[0] = 0x12
+	nonce[1] = 0x34
+
+	plaintext := []byte("test Magma MGM AEAD mode 12345")
+	aad := []byte("additional data")
+
+	sealed := aead.Seal(nil, nonce, plaintext, aad)
+	opened, err := aead.Open(nil, nonce, sealed, aad)
+	if err != nil {
+		t.Fatalf("Magma MGM Open failed: %v", err)
+	}
+	if !bytes.Equal(opened, plaintext) {
+		t.Fatal("Magma MGM roundtrip mismatch")
+	}
+
+	// Tamper test
+	tampered := make([]byte, len(sealed))
+	copy(tampered, sealed)
+	tampered[0] ^= 0xFF
+	_, err = aead.Open(nil, nonce, tampered, aad)
+	if err == nil {
+		t.Fatal("expected Magma MGM Open to fail on tampered ciphertext")
+	}
+}
+
 // TestMGMSealOpenRoundtrip tests that Seal followed by Open returns the original plaintext.
 func TestMGMSealOpenRoundtrip(t *testing.T) {
 	key := make([]byte, gost341215.KuznechikKeySize)
