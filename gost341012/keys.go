@@ -103,11 +103,11 @@ func (pub *PublicKey) Raw() []byte {
 // NewPrivateKey creates a PrivateKey from a little-endian raw key.
 // The raw key length must match the curve's byte size.
 func NewPrivateKey(curve *Curve, raw []byte) (*PrivateKey, error) {
-	if len(raw) != curve.ByteSize() {
-		return nil, errors.New("gost341012: invalid private key size")
-	}
 	if curve == nil {
 		return nil, errors.New("gost341012: curve is nil")
+	}
+	if len(raw) != curve.ByteSize() {
+		return nil, errors.New("gost341012: invalid private key size")
 	}
 	d := leToBigInt(raw)
 	if d.Sign() <= 0 || d.Cmp(curve.Q) >= 0 {
@@ -119,12 +119,12 @@ func NewPrivateKey(curve *Curve, raw []byte) (*PrivateKey, error) {
 // NewPublicKey creates a PublicKey from a raw key: LE(X) || LE(Y).
 // The raw key length must be 2 * curve.ByteSize().
 func NewPublicKey(curve *Curve, raw []byte) (*PublicKey, error) {
+	if curve == nil {
+		return nil, errors.New("gost341012: curve is nil")
+	}
 	size := curve.ByteSize()
 	if len(raw) != 2*size {
 		return nil, errors.New("gost341012: invalid public key size")
-	}
-	if curve == nil {
-		return nil, errors.New("gost341012: curve is nil")
 	}
 	x := leToBigInt(raw[:size])
 	y := leToBigInt(raw[size:])

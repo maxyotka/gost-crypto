@@ -17,6 +17,8 @@ package gost341112
 import (
 	"encoding/binary"
 	"hash"
+
+	"github.com/maxyotka/gost-crypto/internal/subtle"
 )
 
 const (
@@ -29,11 +31,12 @@ const (
 )
 
 type digest struct {
-	size int
-	n    uint64
-	hsh  [BlockSize]byte
-	chk  [BlockSize]byte
-	buf  []byte
+	size   int
+	n      uint64
+	hsh    [BlockSize]byte
+	chk    [BlockSize]byte
+	buf    [BlockSize]byte
+	bufLen int
 }
 
 // New512 returns a new hash.Hash computing the Stribog-512 checksum.
@@ -70,22 +73,15 @@ func Sum512(data []byte) [Size512]byte {
 
 func (d *digest) Reset() {
 	d.n = 0
-	// Zero buffered data using a loop to prevent compiler optimization.
-	for i := range d.buf {
-		d.buf[i] = 0
-	}
-	d.buf = nil
-	for i := range d.chk {
-		d.chk[i] = 0
-	}
+	d.bufLen = 0
+	subtle.Zeroize(d.buf[:])
+	subtle.Zeroize(d.chk[:])
 	if d.size == Size256 {
 		for i := range d.hsh {
 			d.hsh[i] = 1
 		}
 	} else {
-		for i := range d.hsh {
-			d.hsh[i] = 0
-		}
+		subtle.Zeroize(d.hsh[:])
 	}
 }
 
@@ -93,27 +89,45 @@ func (d *digest) Size() int      { return d.size }
 func (d *digest) BlockSize() int { return BlockSize }
 
 func (d *digest) Write(data []byte) (int, error) {
-	d.buf = append(d.buf, data...)
-	for len(d.buf) >= BlockSize {
+	nn := len(data)
+	// Fill the buffer first.
+	if d.bufLen > 0 {
+		n := copy(d.buf[d.bufLen:], data)
+		d.bufLen += n
+		data = data[n:]
+		if d.bufLen == BlockSize {
+			d.hsh = g(d.n, d.hsh, d.buf)
+			d.chk = add512(d.chk, d.buf)
+			d.n += BlockSize * 8
+			d.bufLen = 0
+		}
+	}
+	// Process full blocks directly.
+	for len(data) >= BlockSize {
 		var block [BlockSize]byte
-		copy(block[:], d.buf[:BlockSize])
+		copy(block[:], data[:BlockSize])
 		d.hsh = g(d.n, d.hsh, block)
 		d.chk = add512(d.chk, block)
 		d.n += BlockSize * 8
-		d.buf = d.buf[BlockSize:]
+		data = data[BlockSize:]
 	}
-	return len(data), nil
+	// Buffer remaining bytes.
+	if len(data) > 0 {
+		copy(d.buf[:], data)
+		d.bufLen = len(data)
+	}
+	return nn, nil
 }
 
 func (d *digest) Sum(in []byte) []byte {
 	var buf [BlockSize]byte
-	copy(buf[:], d.buf)
-	buf[len(d.buf)] = 1
+	copy(buf[:], d.buf[:d.bufLen])
+	buf[d.bufLen] = 1
 
 	hsh := g(d.n, d.hsh, buf)
 
 	var nBuf [BlockSize]byte
-	binary.LittleEndian.PutUint64(nBuf[:8], d.n+uint64(len(d.buf))*8)
+	binary.LittleEndian.PutUint64(nBuf[:8], d.n+uint64(d.bufLen)*8)
 
 	hsh = g(0, hsh, nBuf)
 	hsh = g(0, hsh, add512(d.chk, buf))
