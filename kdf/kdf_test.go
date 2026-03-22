@@ -264,3 +264,88 @@ func TestKeyWrapInvalidLength(t *testing.T) {
 		t.Fatal("WrapKey should reject empty CEK")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// KAT vectors from R 50.1.113-2016 Appendix A
+// ---------------------------------------------------------------------------
+
+// TestKAT_HMAC256 verifies HMAC-Stribog-256 against R 50.1.113-2016
+// Appendix A, test 1 (HMAC_GOSTR3411_2012_256).
+func TestKAT_HMAC256(t *testing.T) {
+	key, _ := hex.DecodeString("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
+	data, _ := hex.DecodeString("0126bdb87800af214341456563780100")
+	expected, _ := hex.DecodeString("a1aa5f7de402d7b3d323f2991c8d4534013137010a83754fd0af6d7cd4922ed9")
+
+	h := NewHMAC256(key)
+	h.Write(data)
+	got := h.Sum(nil)
+
+	if !bytes.Equal(got, expected) {
+		t.Fatalf("HMAC-256 KAT mismatch:\n  got  %x\n  want %x", got, expected)
+	}
+}
+
+// TestKAT_HMAC512 verifies HMAC-Stribog-512 against R 50.1.113-2016
+// Appendix A, test 2 (HMAC_GOSTR3411_2012_512).
+func TestKAT_HMAC512(t *testing.T) {
+	key, _ := hex.DecodeString("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
+	data, _ := hex.DecodeString("0126bdb87800af214341456563780100")
+	expected, _ := hex.DecodeString("a59bab22ecae19c65fbde6e5f4e9f5d8549d31f037f9df9b905500e171923a773d5f1530f2ed7e964cb2eedc29e9ad2f3afe93b2814f79f5000ffc0366c251e6")
+
+	h := NewHMAC512(key)
+	h.Write(data)
+	got := h.Sum(nil)
+
+	if !bytes.Equal(got, expected) {
+		t.Fatalf("HMAC-512 KAT mismatch:\n  got  %x\n  want %x", got, expected)
+	}
+}
+
+// TestKAT_KDF256 verifies KDF_GOSTR3411_2012_256 against R 50.1.113-2016
+// Appendix A, test 11.
+func TestKAT_KDF256(t *testing.T) {
+	key, _ := hex.DecodeString("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
+	label, _ := hex.DecodeString("26bdb878")
+	seed, _ := hex.DecodeString("af21434145656378")
+	expected, _ := hex.DecodeString("a1aa5f7de402d7b3d323f2991c8d4534013137010a83754fd0af6d7cd4922ed9")
+
+	got := KDF256(key, label, seed)
+
+	if !bytes.Equal(got, expected) {
+		t.Fatalf("KDF256 KAT mismatch:\n  got  %x\n  want %x", got, expected)
+	}
+}
+
+// TestKAT_PBKDF2 verifies PBKDF2 with Stribog-512 against
+// R 50.1.111-2016 Appendix A, test 1: P="password", S="salt", c=1, dkLen=64.
+func TestKAT_PBKDF2(t *testing.T) {
+	// Hex from R 50.1.111-2016 Appendix A (OCR-cleaned, verified byte 14: bc not be).
+	expected, _ := hex.DecodeString(
+		"64770af7f748c3b1c9ac831dbcfd85c2" +
+			"6111b30a8a657ddc3056b80ca73e040d" +
+			"2854fd36811f6d825cc4ab66ec0a68a4" +
+			"90a9e5cf5156b3a2b7eecddbf9a16b47",
+	)
+
+	dk := PBKDF2([]byte("password"), []byte("salt"), 1, 64, gost341112.New512)
+
+	if !bytes.Equal(dk, expected) {
+		t.Fatalf("PBKDF2 KAT mismatch:\n  got  %x\n  want %x", dk, expected)
+	}
+}
+
+// TestKAT_PBKDF2_4096 verifies PBKDF2 with c=4096 iterations.
+func TestKAT_PBKDF2_4096(t *testing.T) {
+	expected, _ := hex.DecodeString(
+		"e52deb9a2d2aaff4e2ac9d47a41f34c2" +
+			"0376591c67807f0477e32549dc341bc7" +
+			"867c09841b6d58e29d0347c996301d55" +
+			"df0d34e47cf68f4e3c2cdaf1d9ab86c3",
+	)
+
+	dk := PBKDF2([]byte("password"), []byte("salt"), 4096, 64, gost341112.New512)
+
+	if !bytes.Equal(dk, expected) {
+		t.Fatalf("PBKDF2 c=4096 KAT mismatch:\n  got  %x\n  want %x", dk, expected)
+	}
+}
