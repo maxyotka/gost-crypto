@@ -8,10 +8,14 @@
 package gost341012
 
 import (
+	"crypto"
 	"errors"
 	"io"
 	"math/big"
 )
+
+// Ensure PrivateKey implements crypto.Signer.
+var _ crypto.Signer = (*PrivateKey)(nil)
 
 const (
 	// PrivateKeySize is the size of a 256-bit private key in bytes.
@@ -83,6 +87,23 @@ func (priv *PrivateKey) PublicKey() (*PublicKey, error) {
 		return nil, errors.New("gost341012: scalar multiplication resulted in point at infinity")
 	}
 	return &PublicKey{Curve: priv.Curve, X: x, Y: y}, nil
+}
+
+// Public returns the public key corresponding to this private key.
+// Implements crypto.Signer.
+func (priv *PrivateKey) Public() crypto.PublicKey {
+	pub, err := priv.PublicKey()
+	if err != nil {
+		return nil
+	}
+	return pub
+}
+
+// Sign signs digest with the private key using GOST R 34.10-2012.
+// The opts argument is ignored — the digest is used directly.
+// Implements crypto.Signer.
+func (priv *PrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	return priv.SignDigest(digest, rand)
 }
 
 // Raw returns the private key as a little-endian byte slice.
