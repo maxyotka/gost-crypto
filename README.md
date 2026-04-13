@@ -5,6 +5,13 @@
   <img src="https://img.shields.io/badge/KAT-RFC%20%2B%20ГОСТ-brightgreen?style=for-the-badge" alt="KAT Verified"/>
 </p>
 
+<p align="center">
+  <a href="https://pkg.go.dev/github.com/maxyotka/gost-crypto"><img src="https://pkg.go.dev/badge/github.com/maxyotka/gost-crypto.svg" alt="Go Reference"/></a>
+  <a href="https://goreportcard.com/report/github.com/maxyotka/gost-crypto"><img src="https://goreportcard.com/badge/github.com/maxyotka/gost-crypto" alt="Go Report Card"/></a>
+  <a href="https://github.com/maxyotka/gost-crypto/actions/workflows/test.yml"><img src="https://github.com/maxyotka/gost-crypto/actions/workflows/test.yml/badge.svg" alt="CI"/></a>
+  <a href="https://github.com/maxyotka/gost-crypto/releases/latest"><img src="https://img.shields.io/github/v/release/maxyotka/gost-crypto?sort=semver" alt="Release"/></a>
+</p>
+
 # gost-crypto
 
 Библиотека криптографических алгоритмов по актуальным российским стандартам ГОСТ для Go.
