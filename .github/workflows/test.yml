@@ -20,10 +20,17 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - name: Test
-        run: go test -count=1 ./...
+        run: go test -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Vet
         run: go vet ./...
+
+      - name: Upload coverage to Codecov
+        if: matrix.go-version == '1.24'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.out
+          fail_ci_if_error: false
 
   benchmark:
     runs-on: ubuntu-latest
