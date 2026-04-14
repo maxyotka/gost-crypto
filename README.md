@@ -52,20 +52,62 @@ go get github.com/maxyotka/gost-crypto
 
 ## Быстрый старт
 
-```go
-package main
+### Хеширование — Стрибог
 
+```go
+import "github.com/maxyotka/gost-crypto/gost341112"
+
+h := gost341112.New256()
+h.Write([]byte("Hello, ГОСТ!"))
+fmt.Printf("%x\n", h.Sum(nil))
+```
+
+### Аутентифицированное шифрование — Кузнечик MGM (RFC 9058)
+
+```go
 import (
-    "fmt"
+    "github.com/maxyotka/gost-crypto/gost341215"
+    "github.com/maxyotka/gost-crypto/mgm"
+)
+
+key := make([]byte, gost341215.KuznechikKeySize)
+block, _ := gost341215.NewKuznechik(key)
+aead, _ := mgm.NewMGM(block, block.BlockSize())
+
+nonce := make([]byte, aead.NonceSize())
+nonce[0] = 0x11 // MSB must be zero per RFC 9058
+ciphertext := aead.Seal(nil, nonce, []byte("secret"), []byte("aad"))
+plaintext, _ := aead.Open(nil, nonce, ciphertext, []byte("aad"))
+```
+
+### Цифровая подпись — ГОСТ Р 34.10-2012
+
+```go
+import (
+    "crypto/rand"
+    "github.com/maxyotka/gost-crypto/gost341012"
     "github.com/maxyotka/gost-crypto/gost341112"
 )
 
-func main() {
-    h := gost341112.New256()
-    h.Write([]byte("Hello, ГОСТ!"))
-    fmt.Printf("%x\n", h.Sum(nil))
-}
+curve := gost341012.CurveParamSetA()
+priv, pub, _ := gost341012.GenerateKey(curve, rand.Reader)
+
+digest := gost341112.Sum256([]byte("message"))
+sig, _ := priv.SignDigest(digest[:], rand.Reader)
+ok, _ := pub.VerifyDigest(digest[:], sig)
 ```
+
+### Ключевое согласование — VKO (RFC 7836)
+
+```go
+import "github.com/maxyotka/gost-crypto/vko"
+
+aliceKEK, _ := vko.KEK256(alicePriv, bobPub, ukm)
+bobKEK, _ := vko.KEK256(bobPriv, alicePub, ukm)
+// aliceKEK == bobKEK
+```
+
+Больше runnable-примеров — на [pkg.go.dev](https://pkg.go.dev/github.com/maxyotka/gost-crypto).
 
 ## Производительность
 
